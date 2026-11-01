@@ -90,7 +90,7 @@ The 16 workflow checks cover the streamlined operations and background-review sn
 
 ## Sign-in and roles
 
-Pages and API routes require a signed-in account, provided by Neon Auth (email and password). Sign-up is limited to emails in `ALLOWED_SIGNUP_EMAILS`. Copy `.env.example` to `.env.local` and fill in the values.
+Pages and API routes require a signed-in account, provided by Neon Auth (email and password). Our sign-up page accepts only emails in `ALLOWED_SIGNUP_EMAILS`. Neon Auth itself must also have public sign-up turned off in the Neon console, or other accounts could still be created through the service. Confirm this setting before relying on the invite list. Copy `.env.example` to `.env.local` and fill in the values.
 
 Each account needs a row in `user_roles` (role `Contractor` or `Consultant`). The owner adds these rows by hand. Event writes use the signed-in account's role, and an account with no role cannot write events. Consultant decisions are recorded only by a consultant account.
 
