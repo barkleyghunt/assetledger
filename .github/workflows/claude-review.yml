@@ -60,8 +60,11 @@ jobs:
           if jq -e '.error' "$RUNNER_TEMP/review/response.json" >/dev/null 2>&1; then
             echo "Review could not run: API returned an error." > "$RUNNER_TEMP/review/comment.md"
           else
-            jq -r '[.content[] | select(.type == "text") | .text] | join("\n")' \
+            jq -r '[(.content // [])[] | select(.type == "text") | .text] | join("\n")' \
               "$RUNNER_TEMP/review/response.json" > "$RUNNER_TEMP/review/comment.md"
+            if [ ! -s "$RUNNER_TEMP/review/comment.md" ]; then
+              echo "Review produced no text." > "$RUNNER_TEMP/review/comment.md"
+            fi
             if jq -e '.stop_reason == "max_tokens"' "$RUNNER_TEMP/review/response.json" >/dev/null 2>&1; then
               echo "" >> "$RUNNER_TEMP/review/comment.md"
               echo "_Review was cut short; ask for a narrower review._" >> "$RUNNER_TEMP/review/comment.md"
