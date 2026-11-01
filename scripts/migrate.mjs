@@ -11,8 +11,10 @@ if (!url) {
 
 const sql = neon(url);
 const schema = readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
-// Each statement in schema.sql is run separately.
-for (const statement of schema.split(";").map((s) => s.replace(/--.*$/gm, "").trim()).filter(Boolean)) {
+// Remove comments first, so a semicolon inside a comment is not read as a statement break.
+const withoutComments = schema.replace(/--.*$/gm, "");
+// Each statement is run separately.
+for (const statement of withoutComments.split(";").map((s) => s.trim()).filter(Boolean)) {
   await sql.query(statement);
 }
 console.log("Migration complete: audit_events is ready.");
