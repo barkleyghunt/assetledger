@@ -87,3 +87,11 @@ Routine stages now use a checklist, evidence/verification note and next location
 The visual design uses navy navigation, blue primary actions, darker text, clearer borders and labelled traffic lights. Main instructions and labels are approximately 15–16px; headings, controls and touch targets are larger. Both the existing workspace and workflow screens use the higher-contrast theme. This is not a full accessibility certification.
 
 The 16 workflow checks cover the streamlined operations and background-review snapshots as well as the separate consultant/contractor authority rules. No cloud storage, actual uploads or secure accounts have been added.
+
+## Sign-in and roles
+
+Pages and API routes require a signed-in account, provided by Neon Auth (email and password). Sign-up is limited to emails in `ALLOWED_SIGNUP_EMAILS`. Copy `.env.example` to `.env.local` and fill in the values.
+
+Each account needs a row in `user_roles` (role `Contractor` or `Consultant`). The owner adds these rows by hand. Event writes use the signed-in account's role, and an account with no role cannot write events. Consultant decisions are recorded only by a consultant account.
+
+This is a demo-grade control for a small invited group. It is not a full audit or compliance system.
