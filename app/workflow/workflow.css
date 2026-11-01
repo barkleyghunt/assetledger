@@ -8,3 +8,26 @@
 .flow-main{padding-top:24px}.flow-header{font-size:15px}.flow-header a:last-child{font-size:14px}.flow-tabs button{font-size:15px;font-weight:600;min-height:50px;color:#203d5d}.flow-tabs button.selected{background:#174c99;color:#fff;border-color:#103b79}.flow-tabs button.selected span{color:#14283b;background:#fff}.flow-tabs button span{background:#cadcf1;color:#163b63;font-size:13px}.flow-tabs button:hover:not(.selected){background:#d5e4f6}.signal{font-size:13px;font-weight:600;padding:7px 10px}.element-pin{font-size:14px;padding:9px 11px;border-radius:6px}.element-pin.red{background:#971f30}.element-pin.green{background:#15563b}.element-pin.amber{color:#4c3000;background:#ffd45c}.pin-selected{outline-color:#132c46}.elevation{margin:30px 0}.flow-register .register-selected{background:#e5effb;border-left-color:#174c99}.flow-register strong{font-size:16px}.flow-register small{font-size:14px}.journey li{font-size:13px;color:#43576b;border-top-color:#9eafc0;line-height:1.6}.journey li.current{border-top-color:#174c99;color:#123d70;background:#dfebfa}.journey li.past{color:#15563b;border-color:#216548}.journey li span{font-size:17px}.gate-summary{background:#e5edf6;font-size:15px}.gate-summary span{color:#354d63}.separate-checks strong,.separate-checks span{font-size:14px}.separate-checks>div{background:#f0f5fb;border-color:#9bb0c4}.stage-note{font-size:15px}.flow-page input:not([type=checkbox]){font-size:16px;border-color:#6b8299;min-height:46px}.flow-page textarea{font-size:16px}.flow-page .timeline-section h3,.flow-page .quick-complete h3{font-size:20px}.event-timeline small{font-size:13px;color:#43576b}.event-timeline strong{font-size:15px}.event-timeline p{font-size:15px;color:#354d63}.evidence-summary{font-size:15px;background:#edf3fa;border-color:#829bb4;color:#354d63}.danger-button{color:#971f30;background:#fff0f2;border-color:#a43848}.today-task{border-color:#a8b7c6;background:#f6f9fd}.today-task strong{font-size:16px}.today-task p{font-size:15px}.today-task small{font-size:14px;color:#754700}.inbox-note{border-left-color:#174c99}.inbox-note p,.plan-history,.proposal-card{font-size:15px}.control-row strong,.control-row label{font-size:15px}.control-readonly>div{font-size:15px}.control-readonly small{font-size:14px}.flow-feedback{color:#173b60;background:#deebfb;border-color:#6e8faf;font-size:15px}.quick-complete{margin:24px 0;padding:22px;background:#e7f0fd;border:2px solid #5b80af;border-radius:7px}.check-confirm{display:flex;align-items:flex-start;gap:12px;font-size:16px;margin:20px 0;line-height:1.6}.check-confirm input{width:22px;height:22px;flex-shrink:0;accent-color:#174c99;margin-top:3px}.quick-primary{margin-top:20px;min-height:50px}.more-actions{margin-top:20px;border-top:1px solid #a8b7c6;padding-top:15px}.more-actions summary{font-size:14px;color:#244e7b;cursor:pointer}.background-reviews article{border-top:1px solid #a8b7c6;padding:20px 0}.background-reviews{border-left:5px solid #ad7600}.control-readonly small{color:#43576b}
 @media(max-width:800px){.flow-overview{grid-template-columns:1fr}.flow-page .page-heading h1{font-size:30px}.flow-tabs button{font-size:14px;padding:12px}.event-timeline article>div{flex-wrap:wrap}.quick-complete{padding:16px}.signal{white-space:normal}.element-pin{font-size:12px;padding:7px}.journey{grid-template-columns:repeat(4,1fr)}.today-task>div{flex-wrap:wrap}.flow-register button{gap:10px}}
 @media(max-width:450px){.flow-tabs{display:grid;grid-template-columns:1fr}.flow-tabs button{text-align:left;font-size:15px}.element-pin{font-size:11px;padding:6px}.journey{grid-template-columns:repeat(2,1fr)}.flow-header{gap:12px}.flow-brand{font-size:23px}.flow-page .panel-heading{flex-wrap:wrap}.flow-page .primary{width:100%;justify-content:center}.flow-register .signal{max-width:52%}}
+
+/* Phone-first: the schematic is hidden on narrow screens, where the stage list below does the same job. */
+@media (max-width: 800px) {
+  .elevation-panel { display: none; }
+  .flow-overview { grid-template-columns: 1fr; }
+  .flow-page button,
+  .flow-register button,
+  .flow-tabs button,
+  .flow-actions button,
+  .danger-button,
+  .today-task { min-height: 44px; }
+  .flow-page input,
+  .flow-page textarea,
+  .flow-page select { font-size: 16px; }
+  .journey li { font-size: 14px; }
+  .signal,
+  .badge,
+  .flow-register small,
+  .event-timeline small,
+  .today-task small,
+  .gate-summary span { font-size: 14px; }
+  .flow-register strong { font-size: 16px; }
+}
