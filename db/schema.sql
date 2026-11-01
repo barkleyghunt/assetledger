@@ -11,3 +11,11 @@ CREATE TABLE IF NOT EXISTS audit_events (
 );
 
 CREATE INDEX IF NOT EXISTS audit_events_element_idx ON audit_events (element_id, created_at);
+
+-- Maps a signed-in account to its role. Only the owner adds rows, by hand.
+-- user_id is the Neon Auth user id; an account with no row has no role and cannot write events.
+CREATE TABLE IF NOT EXISTS user_roles (
+  user_id     TEXT PRIMARY KEY,
+  role        TEXT NOT NULL CHECK (role IN ('Contractor', 'Consultant')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

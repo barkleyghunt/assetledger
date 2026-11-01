@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SignOutButton } from "@/components/sign-out-button";
 
 export const metadata: Metadata = {
   title: "Asset Ledger · Field Workspace",
@@ -7,5 +8,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>
+    <SignOutButton />
+    {children}
+  </body></html>;
 }
