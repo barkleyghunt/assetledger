@@ -1,69 +1,80 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import Roadmap from "./roadmap";
+import Link from "next/link";
+
+type Status = "Full-Stop" | "In review" | "Reviewed";
+type Heritage = { material: string; dimensions: string; originalLocation: string; storageLocation: string; phase: string; significance: string };
+type Asset = { heritage?: Heritage; id: string; name: string; category: string; location: string; status: Status; condition: string; note: string; comments: string[] };
+const seed: Asset[] = [
+  { id: "AL-001", name: "Main distribution panel", category: "Electrical", location: "Building A · Ground floor", status: "Full-Stop", condition: "Needs investigation", note: "Panel identification does not match the demonstration drawing. Confirm the asset reference before proceeding.", comments: ["Demo consultant: Please reconcile the panel tag with the drawing register."] },
+  { id: "AL-002", name: "Air handling unit 02", category: "Mechanical", location: "Building A · Roof", status: "In review", condition: "Fair", note: "Visible surface corrosion at the base. A closer inspection is requested in this demo record.", comments: ["Demo field team: Condition photos are still required; no files are attached."] },
+  { id: "AL-003", name: "Fire door assembly", category: "Life safety", location: "Building B · Level 01", status: "In review", condition: "Good", note: "Door reference and location captured for consultant review. Compliance has not been assessed.", comments: [] },
+  { id: "AL-004", name: "Chilled water pump", category: "Mechanical", location: "Building A · Plant room", status: "Reviewed", condition: "Good", note: "Synthetic record reviewed for completeness only. No engineering approval is implied.", comments: ["Demo consultant: Inventory information is complete for this example."] },
+  { id: "AL-005", name: "Emergency light EL-12", category: "Electrical", location: "Building B · Stair 02", status: "Full-Stop", condition: "Not verified", note: "Functional test information is missing. Hold this record pending supporting evidence.", comments: [] },
+  { id: "AL-006", name: "Roof access hatch", category: "Architectural", location: "Building A · Roof", status: "Reviewed", condition: "Fair", note: "Seal wear recorded. Demonstration maintenance follow-up only.", comments: [] },
+  { id: "GY-192", name: "Carved limestone cornice", category: "Heritage masonry", location: "Skid 42", status: "Full-Stop", condition: "Cracked arris", note: "Synthetic example: a repair approach is required before this element proceeds. No real consultant decision has been recorded.", comments: ["Demo consultant: Attach condition photographs and a proposed repair method before review."], heritage: { material: "Limestone", dimensions: "820 × 340 × 260 mm (demo)", originalLocation: "West elevation · Bay 04", storageLocation: "Skid 42 · Covered store", phase: "Stored", significance: "Decorative cornice; significance assessment pending." } },
+  { id: "JW-582", name: "Limestone window surround", category: "Heritage masonry", location: "Repair Bay", status: "In review", condition: "Surface loss", note: "Synthetic example: confirm the proposed treatment and retain the original element identifier.", comments: [], heritage: { material: "Limestone", dimensions: "640 × 280 × 190 mm (demo)", originalLocation: "West elevation · Window W-08", storageLocation: "Repair Bay · Rack 03", phase: "Restoration", significance: "Original surround profile; material history not yet assessed." } },
+  { id: "UB-038", name: "Green marble entrance panel", category: "Heritage stone", location: "Crate 12", status: "Reviewed", condition: "Good", note: "Synthetic example: catalogue completeness reviewed only. No treatment or reinstallation approval is implied.", comments: [], heritage: { material: "Green marble", dimensions: "900 × 600 × 30 mm (demo)", originalLocation: "Main entrance · Panel 02", storageLocation: "Crate 12 · Indoor store", phase: "Stored", significance: "Entrance finish; provenance documentation pending." } },
+  { id: "HY-142", name: "Limestone parapet coping", category: "Heritage masonry", location: "East Parapet", status: "In review", condition: "Weathered", note: "Synthetic example: surveyed in place. Photographic documentation and a conservation assessment remain outstanding.", comments: [], heritage: { material: "Limestone", dimensions: "760 × 450 × 180 mm (demo)", originalLocation: "East elevation · Parapet E-12", storageLocation: "In situ · Not removed", phase: "Surveyed", significance: "Historic roofline element; assessment pending." } },
+];
+const sections = ["Project Dashboard", "Asset Catalogue", "Consultant Review", "Development Roadmap"] as const;
+type Section = typeof sections[number];
+function Badge({ status }: { status: Status }) { return <span className={`badge ${status === "Full-Stop" ? "stop" : status === "Reviewed" ? "done" : "review"}`}><span aria-hidden="true">●</span> {status}</span>; }
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+  const [section, setSection] = useState<Section>("Project Dashboard");
+  const [assets, setAssets] = useState(seed);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("All statuses");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [comment, setComment] = useState("");
+  const [notice, setNotice] = useState("");
+  const current = assets.find(a => a.id === selected);
+  const stops = assets.filter(a => a.status === "Full-Stop");
+  const reviewed = assets.filter(a => a.status === "Reviewed").length;
+  const queue = assets.filter(a => a.status !== "Reviewed");
+  const visible = assets.filter(a => (section !== "Consultant Review" || a.status !== "Reviewed") && (filter === "All statuses" || a.status === filter) && `${a.id} ${a.name} ${a.location} ${a.category} ${a.heritage?.material ?? ""} ${a.heritage?.originalLocation ?? ""} ${a.heritage?.storageLocation ?? ""}`.toLowerCase().includes(query.toLowerCase()));
+  function navigate(next: Section) { setSection(next); setSelected(null); setQuery(""); setFilter("All statuses"); setNotice(""); }
+  function open(id: string) { setSelected(id); setComment(""); setNotice(""); }
+  function changeStatus(status: Status) { setAssets(old => old.map(a => a.id === selected ? { ...a, status } : a)); setNotice(`Demo status changed to ${status}. This change resets on refresh.`); }
+  return <div className="workspace">
+    <a className="skip" href="#main">Skip to content</a>
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-mark">▦</span><span>asset<span className="brand-light">ledger</span><small>FIELD WORKSPACE</small></span></div>
+      <div className="workspace-label">WORKSPACE</div>
+      <div className="project-switch"><span className="project-icon">N</span><div>Northline Campus<small>Demonstration project</small></div></div>
+      <nav aria-label="Workspace">{sections.map((s, i) => <button key={s} aria-current={section === s ? "page" : undefined} className={section === s ? "nav active" : "nav"} onClick={() => navigate(s)}><span aria-hidden="true">{["◫", "▦", "☷", "↗"][i]}</span>{s}{i === 2 && <span className="nav-count">{queue.length}</span>}</button>)}<Link href="/workflow" className="nav" style={{textDecoration:"none"}}><span aria-hidden="true">◉</span>Drawing & stage checks</Link></nav>
+      <div className="sidebar-bottom"><span className="demo-dot" /> DEMO ENVIRONMENT<p>Synthetic records.<br />Built for exploring the workflow.</p><div className="avatar-line"><span className="avatar">FT</span><div>Field team<small>Local demo session</small></div></div></div>
+    </aside>
+    <div className="body">
+      <header className="topbar"><span>Projects <span className="slash">/</span> <strong>Northline Campus</strong></span><span className="environment">DEMO · LOCAL</span></header>
+      <main id="main">
+        <div className="demo-banner"><span aria-hidden="true">ⓘ</span> Synthetic demonstration data. Changes stay in this open session and reset on refresh. No sign-in, storage, or access controls are implemented.</div>
+        {current ? <>
+          <button className="back" onClick={() => setSelected(null)}>← Back to {section.toLowerCase()}</button>
+          <div className="page-heading"><div><div className="eyebrow">ASSET RECORD / {current.id}</div><h1>{current.name}</h1><p>{current.location}</p></div><Badge status={current.status} /></div>
+          {current.status === "Full-Stop" && <div className="stop-banner"><strong>Full-Stop · Action required</strong><p>This demo record is on hold. Resolve the issue and record your review before changing its status. This is a workflow label, not a physical safety control.</p></div>}
+          <div className="detail-grid"><section className="panel"><div className="panel-heading"><h2>Asset information</h2><span className="eyebrow">SYNTHETIC RECORD</span></div><dl>{[["Asset reference", current.id], ["Discipline", current.category], ["Location", current.location], ...(current.heritage ? [["Material", current.heritage.material], ["Dimensions", current.heritage.dimensions], ["Original location", current.heritage.originalLocation], ["Storage location", current.heritage.storageLocation], ["Conservation phase", current.heritage.phase]] : []), ["Observed condition", current.condition], ["Evidence", "No files attached"]].map(([k,v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>{current.heritage && <><h3>Heritage significance & material history</h3><p className="observation">{current.heritage.significance}</p><p className="hint">Movement events, treatment records and before / during / after photographs are planned. No movement history or files have been captured.</p></>}<h3>Field observation</h3><p className="observation">{current.note}</p><div className="drawing" aria-label="Illustrative asset placeholder, no capture attached"><span>▧</span><strong>Capture evidence belongs here</strong><small>No photographs or scans are attached to this demo.</small></div></section>
+          <section className="panel"><div className="panel-heading"><h2>Consultant review</h2><span className="count">{current.comments.length} comments</span></div><label className="field-label" htmlFor="review-status">Demo review status</label><select id="review-status" value={current.status} onChange={e => changeStatus(e.target.value as Status)}><option>Full-Stop</option><option>In review</option><option>Reviewed</option></select><p className="hint">Reviewed means demo record completeness only; it is not technical or safety approval.</p><div className="comments">{current.comments.length ? current.comments.map((c,i) => <article className="comment" key={i}><span className="comment-marker">{i + 1}</span><p>{c}</p></article>) : <p className="hint">No comments yet. Add the first review note.</p>}</div><form onSubmit={e => { e.preventDefault(); if (!comment.trim()) return; setAssets(old => old.map(a => a.id === selected ? {...a, comments: [...a.comments, `You (demo): ${comment.trim()}`]} : a)); setComment(""); setNotice("Comment added to this session. It resets on refresh."); }}><label className="field-label" htmlFor="comment">Add a review comment</label><textarea id="comment" placeholder="Record an observation or next step…" maxLength={2000} value={comment} onChange={e => setComment(e.target.value)} rows={4} /><button className="primary" disabled={!comment.trim()}>Add comment <span>↗</span></button></form><p role="status" className="hint">{notice}</p></section></div>
+        </> : <>
+          <div className="page-heading"><div><div className="eyebrow">NORTHLINE CAMPUS / PROJECT NL-026</div><h1>{section}</h1><p>{section === "Project Dashboard" ? "A clear picture of your site. A focused plan for what’s next." : section === "Asset Catalogue" ? "Find building assets and heritage elements in one catalogue." : section === "Development Roadmap" ? "Seven design references. One integrated Asset Ledger application." : "Work through observations and keep review decisions visible."}</p></div><button className="secondary" onClick={() => navigate(section === "Project Dashboard" ? "Asset Catalogue" : "Project Dashboard")}>{section === "Project Dashboard" ? "Explore assets ↗" : "← Dashboard"}</button></div>
+          {section === "Development Roadmap" ? <Roadmap /> : section === "Project Dashboard" ? <>
+            <section className="panel heritage-summary"><div><div className="eyebrow">NEW · WORKFLOW LAB</div><h2>Follow an element from removal to storage.</h2><p className="muted">Try the drawing, traffic lights, daily lists and project-specific stage checks in a local simulation.</p></div><Link className="secondary" style={{textDecoration:"none"}} href="/workflow">Open workflow lab →</Link></section>
+            <div className="stats">{[["Total assets", assets.length, `Across ${new Set(assets.map(a => a.category)).size} disciplines`, "neutral"], ["Awaiting review", queue.length, "Records requiring attention", "amber"], ["Full-Stop", stops.length, "On hold · action required", "red"], ["Reviewed", reviewed, "Demo completeness review", "green"]].map(([title,value,sub,color]) => <section className={`stat ${color}`} key={title}><span>{title}</span><strong>{value}</strong><small>{sub}</small></section>)}</div>
+            <div className="dashboard-grid"><section className="panel priority"><div className="panel-heading"><div><div className="eyebrow">NEXT UP</div><h2>Focus on the blockers</h2></div><span className="badge stop">{stops.length} Full-Stop</span></div><p className="muted">These records need attention before their review can move forward.</p>{stops.length ? stops.map(a => <button className="blocker" key={a.id} onClick={() => open(a.id)}><span className="stop-icon">!</span><span><small>{a.id} · {a.category}</small><strong>{a.name}</strong><span>{a.location}</span></span><span className="arrow">↗</span></button>) : <p className="empty">No Full-Stop records remain in this demo session.</p>}<button className="text-button" onClick={() => navigate("Consultant Review")}>Open consultant review <span>→</span></button></section>
+            <section className="panel progress-panel"><div className="eyebrow">PROJECT PULSE</div><h2>Every record counts.</h2><div className="progress-number">{Math.round(reviewed/assets.length*100)}<span>%</span></div><p className="muted">of demo assets reviewed</p><div className="progress-track"><div style={{width: `${reviewed/assets.length*100}%`}} /></div><div className="progress-caption"><span>{reviewed} reviewed</span><span>{assets.length - reviewed} to go</span></div><div className="pulse-note">Keep observations, asset references, and review comments together.</div></section></div>
+            <section className="panel heritage-summary"><div><div className="eyebrow">HERITAGE CONSERVATION</div><h2>Original elements. One connected ledger.</h2><p className="muted">Four synthetic heritage records now join the inventory, preserving original IDs, materials, dimensions and storage locations.</p></div><button className="secondary" onClick={() => navigate("Development Roadmap")}>View development roadmap →</button></section>
+            <section className="panel"><div className="panel-heading"><div><div className="eyebrow">THE INVENTORY</div><h2>Assets at a glance</h2></div><button className="text-button" onClick={() => navigate("Asset Catalogue")}>View catalogue →</button></div><AssetList assets={assets.slice(0,4)} open={open} /></section>
+          </> : <>
+            {section === "Consultant Review" && <div className="review-intro"><strong>{queue.length} records awaiting review</strong><span>Full-Stop indicates a hold requiring follow-up. Status changes here are demonstration actions only.</span></div>}
+            <section className="panel catalogue"><div className="toolbar"><label className="search"><span aria-hidden="true">⌕</span><input aria-label="Search assets" placeholder="Search ID, name, material or location…" value={query} onChange={e => setQuery(e.target.value)} /></label><select aria-label="Filter by status" value={filter} onChange={e => setFilter(e.target.value)}><option>All statuses</option><option>Full-Stop</option><option>In review</option>{section === "Asset Catalogue" && <option>Reviewed</option>}</select></div><div className="results" aria-live="polite">{visible.length} {visible.length === 1 ? "asset" : "assets"} shown</div><AssetList assets={visible} open={open} />{!visible.length && <div className="empty"><h2>No matching assets</h2><p>Try a different search or status.</p><button className="secondary" onClick={() => {setQuery(""); setFilter("All statuses");}}>Clear filters</button></div>}</section>
+          </>}
+        </>}
+        <footer><span>ASSET LEDGER <span className="footer-dot">/</span> Field clarity, from the ground up.</span><span>Prototype · Synthetic data only</span></footer>
       </main>
     </div>
-  );
+  </div>;
 }
+function AssetList({ assets, open }: { assets: Asset[]; open: (id: string) => void }) { return <div className="asset-list"><div className="table-labels"><span>ASSET / REFERENCE</span><span>LOCATION</span><span>REVIEW STATUS</span><span /></div>{assets.map(a => <button className="asset-row" key={a.id} onClick={() => open(a.id)} aria-label={`Open ${a.name}, ${a.id}`}><span className="asset-name"><span className="asset-symbol" aria-hidden="true">{a.category === "Electrical" ? "ϟ" : a.category === "Mechanical" ? "◎" : "▱"}</span><span><strong>{a.name}</strong><small>{a.id} · {a.category}</small></span></span><span className="asset-location">{a.location}</span><span><Badge status={a.status} /></span><span className="arrow" aria-hidden="true">↗</span></button>)}</div>; }
