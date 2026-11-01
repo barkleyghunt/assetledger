@@ -1,7 +1,10 @@
 import { getSql } from "@/lib/db";
 
 const roles = ["Contractor", "Consultant"];
-const kinds = ["Comment", "Question", "Decision", "Progress", "Evidence"];
+const kinds = ["Comment", "Question", "Progress", "Evidence"];
+// Consultant authority and approval decisions need real sign-in and role checks.
+// Until those exist, the API refuses both, so nothing can be recorded as a consultant decision.
+const consultantActionsEnabled = false;
 
 type EventInput = { elementId: string; stage: number; role: string; kind: string; text: string };
 
@@ -11,6 +14,7 @@ function parseEvent(body: unknown): EventInput | string {
   if (typeof b.elementId !== "string" || !b.elementId.trim() || b.elementId.length > 40) return "elementId is required (max 40 characters).";
   if (!Number.isInteger(b.stage) || (b.stage as number) < 0) return "stage must be a non-negative integer.";
   if (typeof b.role !== "string" || !roles.includes(b.role)) return "role must be Contractor or Consultant.";
+  if (b.role === "Consultant" && !consultantActionsEnabled) return "Consultant actions are not available until sign-in is added.";
   if (typeof b.kind !== "string" || !kinds.includes(b.kind)) return "kind is not recognised.";
   if (typeof b.text !== "string" || !b.text.trim() || b.text.length > 2000) return "text is required (max 2000 characters).";
   return { elementId: b.elementId.trim(), stage: b.stage as number, role: b.role, kind: b.kind, text: b.text.trim() };
