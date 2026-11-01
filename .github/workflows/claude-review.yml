@@ -1,0 +1,69 @@
+name: Claude review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build review prompt
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/review"
+          git diff "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/review/diff.patch"
+          {
+            echo "You are reviewing a pull request to Asset Ledger, a Next.js demo app."
+            echo "Check the diff against the project rules in README.md and AGENTS.md."
+            echo "Focus on: bugs, broken workflow rules (consultant holds, Full-Stop behaviour,"
+            echo "contractor vs consultant authority), missing tests, and lint/type problems."
+            echo "Reply in short bullet points, most serious first. If nothing is wrong, say so."
+            echo ""
+            echo "README.md:"
+            cat README.md
+            echo ""
+            echo "Diff:"
+            cat "$RUNNER_TEMP/review/diff.patch"
+          } > "$RUNNER_TEMP/review/prompt.txt"
+          # Keep the prompt within a reasonable size for the API.
+          head -c 150000 "$RUNNER_TEMP/review/prompt.txt" > "$RUNNER_TEMP/review/prompt-trim.txt"
+          mv "$RUNNER_TEMP/review/prompt-trim.txt" "$RUNNER_TEMP/review/prompt.txt"
+
+      - name: Call Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          jq -n --rawfile prompt "$RUNNER_TEMP/review/prompt.txt" \
+            '{model: "claude-sonnet-5-5", max_tokens: 1500, messages: [{role: "user", content: $prompt}]}' \
+            > "$RUNNER_TEMP/review/request.json"
+          curl -sS https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d @"$RUNNER_TEMP/review/request.json" \
+            > "$RUNNER_TEMP/review/response.json"
+          jq -r '.content[0].text // ("Review failed: " + (tostring))' \
+            "$RUNNER_TEMP/review/response.json" > "$RUNNER_TEMP/review/comment.md"
+
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## Claude review"
+            echo ""
+            cat "$RUNNER_TEMP/review/comment.md"
+          } > "$RUNNER_TEMP/review/post.md"
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/review/post.md"
