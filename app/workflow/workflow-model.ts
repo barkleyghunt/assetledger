@@ -2,10 +2,10 @@ export type Role = "Contractor" | "Consultant";
 export type Rule = "Record only" | "Team check" | "Consultant review" | "Hold point";
 export type Light = "red" | "amber" | "green";
 export type Gate = { rule: Rule; hours: number; version: number };
-export type Event = { id: number; at: string; role: Role; stage: number; text: string; kind: "Comment" | "Question" | "Decision" | "Progress" | "Evidence" };
+export type Event = { id: number; at: string; role: Role; by?: string; stage: number; text: string; kind: "Comment" | "Question" | "Decision" | "Progress" | "Evidence" };
 export type Element = { evidenceVersion: number; id: string; name: string; stage: number; gate: Gate; light: Light; submitted: boolean; question: boolean; questionBy?: Role; contractorPassed: boolean; consultantPassed: boolean; contractorHold: boolean; consultantHold: boolean; note: string; evidence: string; location: string; events: Event[]; due?: string };
 export type Notice = { id: number; recipient: Role; element: string; text: string; at: string; read: boolean };
-export type Proposal = { id: number; plan: Gate[]; baseVersion: number; reason: string; at: string; status: "Pending" | "Approved" | "Rejected"; decision?: string; decidedAt?: string };
+export type Proposal = { id: number; plan: Gate[]; baseVersion: number; reason: string; at: string; by?: string; status: "Pending" | "Approved" | "Rejected"; decision?: string; decidedAt?: string; decidedBy?: string };
 export type Review = { evidenceVersion: number; id: number; element: string; stage: number; evidence: string; at: string; status: "Pending" | "Accepted" | "Full-Stop"; decision?: string };
 export type Model = { reviews: Review[]; elements: Element[]; plan: Gate[]; version: number; planHistory: string[]; notices: Notice[]; sequence: number; proposals: Proposal[] };
 export const stages = ["Identification", "Removal & salvage", "Piece labelling", "Crating", "Crate labelling", "Transportation", "Offsite receipt", "Storage placement"];
@@ -28,8 +28,11 @@ export function createModel(): Model {
  ];
  return {elements,plan,reviews:[],version:1,proposals:[],planHistory:["Version 1 · illustrative consultant oversight plan. No real delegated authority or contractual agreement is recorded."],notices:[{id:4,recipient:"Consultant",element:"GY-192",text:"Internal check complete; removal hold awaits your release.",at:"2026-11-01T13:00:00Z",read:false},{id:5,recipient:"Contractor",element:"JW-582",text:"New consultant question about corner protection.",at:"2026-11-01T13:10:00Z",read:false},{id:6,recipient:"Contractor",element:"UB-038",text:"Crate labelling passed. Start the next stage when ready.",at:"2026-11-01T13:15:00Z",read:false}],sequence:7};
 }
-export type Action = { confirmed?: boolean; type:"evidence"|"comment"|"question"|"submit"|"pass"|"hold"|"advance"|"complete"|"require-review"; id:string; role:Role; text:string; at:string; location?:string };
+export const actionTypes = ["evidence","comment","question","submit","pass","hold","advance","complete","require-review"] as const;
+// `by` names the signed-in person who acted; it is recorded on the event history.
+export type Action = { confirmed?: boolean; type:typeof actionTypes[number]; id:string; role:Role; by?:string; text:string; at:string; location?:string };
 export function transition(model:Model, action:Action):Model {
+ if(!actionTypes.includes(action.type))throw new Error("Unknown action.");
  if(action.type==="complete") {
   if(action.role!=="Contractor")throw new Error("Only the contractor records field completion.");
   const original=model.elements.find(e=>e.id===action.id);
@@ -111,7 +114,7 @@ export function transition(model:Model, action:Action):Model {
   eventText=`Started ${stages[e.stage]} at ${e.location}; plan v${e.gate.version}. New evidence and checks required.`;
  }
  e.light=lightFor(e);
- e.events.push({id:model.sequence,at:action.at,role:action.role,stage:e.stage,kind,text:eventText});
+ e.events.push({id:model.sequence,at:action.at,role:action.role,by:action.by,stage:e.stage,kind,text:eventText});
  let reviews=model.reviews;
  if(action.type==="pass"&&action.role==="Contractor"&&e.gate.rule==="Consultant review") {
   reviews=[...reviews,{evidenceVersion:e.evidenceVersion,id:model.sequence,element:e.id,stage:e.stage,evidence:e.evidence,at:action.at,status:"Pending"}];
@@ -123,39 +126,39 @@ function validatePlan(plan:Gate[],reason:string) {
  if(!reason.trim())throw new Error("A reason is required.");
  if(plan.length!==stages.length||plan.some(g=>!["Record only","Team check","Consultant review","Hold point"].includes(g.rule)||!Number.isFinite(g.hours)||g.hours<1||g.hours>168))throw new Error("Use valid stage requirements and targets between 1 and 168 elapsed hours.");
 }
-export function revisePlan(model:Model,plan:Gate[],reason:string,role:Role,at:string):Model {
+export function revisePlan(model:Model,plan:Gate[],reason:string,role:Role,at:string,by?:string):Model {
  if(role!=="Consultant")throw new Error("Only the consultant can authorize oversight changes on behalf of the client. Contractors submit change requests.");
  validatePlan(plan,reason);
  const version=model.version+1;
- return {...model,version,plan:plan.map(g=>({rule:g.rule,hours:g.hours,version})),planHistory:[`${at} · Version ${version} · Consultant authorization (demo): ${reason.trim()}. Subsequent stage starts only; existing checks and holds retained.`,...model.planHistory],sequence:model.sequence+1,notices:[{id:model.sequence,recipient:"Contractor",element:"",text:`Consultant published oversight plan v${version}: ${reason.trim()}. Current holds unchanged.`,at,read:false},...model.notices]};
+ return {...model,version,plan:plan.map(g=>({rule:g.rule,hours:g.hours,version})),planHistory:[`${at} · Version ${version} · Consultant authorization${by?` by ${by}`:""}: ${reason.trim()}. Subsequent stage starts only; existing checks and holds retained.`,...model.planHistory],sequence:model.sequence+1,notices:[{id:model.sequence,recipient:"Contractor",element:"",text:`Consultant published oversight plan v${version}: ${reason.trim()}. Current holds unchanged.`,at,read:false},...model.notices]};
 }
-export function proposePlan(model:Model,plan:Gate[],reason:string,role:Role,at:string):Model {
+export function proposePlan(model:Model,plan:Gate[],reason:string,role:Role,at:string,by?:string):Model {
  if(role!=="Contractor")throw new Error("Change requests are submitted by the contractor.");
  validatePlan(plan,reason);
  if(model.proposals.some(p=>p.status==="Pending"))throw new Error("A change request is already awaiting consultant decision.");
- return {...model,sequence:model.sequence+2,proposals:[{id:model.sequence,plan:plan.map(g=>({...g})),baseVersion:model.version,reason:reason.trim(),at,status:"Pending"},...model.proposals],notices:[{id:model.sequence+1,recipient:"Consultant",element:"",text:`Contractor requests an oversight change: ${reason.trim()}`,at,read:false},...model.notices]};
+ return {...model,sequence:model.sequence+2,proposals:[{id:model.sequence,plan:plan.map(g=>({...g})),baseVersion:model.version,reason:reason.trim(),at,by,status:"Pending"},...model.proposals],notices:[{id:model.sequence+1,recipient:"Consultant",element:"",text:`Contractor requests an oversight change: ${reason.trim()}`,at,read:false},...model.notices]};
 }
-export function decideProposal(model:Model,id:number,approve:boolean,reason:string,role:Role,at:string):Model {
+export function decideProposal(model:Model,id:number,approve:boolean,reason:string,role:Role,at:string,by?:string):Model {
  if(role!=="Consultant")throw new Error("Only the consultant can decide an oversight change request.");
  const proposal=model.proposals.find(p=>p.id===id);
  if(!proposal||proposal.status!=="Pending")throw new Error("This request is no longer pending.");
  if(!reason.trim())throw new Error("Record the consultant decision reason.");
  if(approve&&proposal.baseVersion!==model.version)throw new Error("The plan changed since this request. Reject it and ask for a new request against the current version.");
- const next=approve?revisePlan(model,proposal.plan,`Contractor request: ${proposal.reason}. Decision: ${reason}`,role,at):model;
- return {...next,sequence:next.sequence+1,proposals:next.proposals.map(p=>p.id===id?{...p,status:approve?"Approved":"Rejected",decision:reason.trim(),decidedAt:at}:p),notices:[{id:next.sequence,recipient:"Contractor",element:"",text:`Oversight change request ${approve?"approved":"rejected"}: ${reason.trim()}`,at,read:false},...next.notices]};
+ const next=approve?revisePlan(model,proposal.plan,`Contractor request: ${proposal.reason}. Decision: ${reason}`,role,at,by):model;
+ return {...next,sequence:next.sequence+1,proposals:next.proposals.map(p=>p.id===id?{...p,status:approve?"Approved":"Rejected",decision:reason.trim(),decidedAt:at,decidedBy:by}:p),notices:[{id:next.sequence,recipient:"Contractor",element:"",text:`Oversight change request ${approve?"approved":"rejected"}: ${reason.trim()}`,at,read:false},...next.notices]};
 }
 
-export function decideReview(model:Model,id:number,accept:boolean,reason:string,role:Role,at:string):Model {
+export function decideReview(model:Model,id:number,accept:boolean,reason:string,role:Role,at:string,by?:string):Model {
  if(role!=="Consultant")throw new Error("Only the consultant can decide a review.");
  if(!reason.trim())throw new Error("Add a review decision reason.");
  const review=model.reviews.find(r=>r.id===id);
  if(!review||review.status!=="Pending")throw new Error("Review is no longer pending.");
  const current=model.elements.find(e=>e.id===review.element)!;
  let next=model;
- if(!accept)next=transition(model,{id:review.element,type:"hold",role,text:`Issue in ${stages[review.stage]} review: ${reason}`,at});
- else if(current.stage===review.stage&&current.evidenceVersion===review.evidenceVersion&&current.gate.rule==="Consultant review"&&!current.consultantHold&&!current.contractorHold&&current.submitted&&current.contractorPassed)next=transition(model,{id:review.element,type:"pass",role,text:reason,at});
+ if(!accept)next=transition(model,{id:review.element,type:"hold",role,by,text:`Issue in ${stages[review.stage]} review: ${reason}`,at});
+ else if(current.stage===review.stage&&current.evidenceVersion===review.evidenceVersion&&current.gate.rule==="Consultant review"&&!current.consultantHold&&!current.contractorHold&&current.submitted&&current.contractorPassed)next=transition(model,{id:review.element,type:"pass",role,by,text:reason,at});
  else {
-  const event:Event={id:model.sequence,at,role,stage:review.stage,kind:"Decision",text:`Earlier-stage evidence review accepted — ${reason}. Current-stage approval unchanged.`};
+  const event:Event={id:model.sequence,at,role,by,stage:review.stage,kind:"Decision",text:`Earlier-stage evidence review accepted — ${reason}. Current-stage approval unchanged.`};
   next={...model,elements:model.elements.map(e=>e.id===review.element?{...e,events:[...e.events,event]}:e),sequence:model.sequence+2,notices:[{id:model.sequence+1,element:review.element,recipient:"Contractor",at,read:false,text:`${stages[review.stage]} review accepted: ${reason}`},...model.notices]};
  }
  return {...next,reviews:next.reviews.map(r=>r.id===id?{...r,status:accept?"Accepted":"Full-Stop",decision:reason.trim()}:r)};

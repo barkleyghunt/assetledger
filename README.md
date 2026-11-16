@@ -1,16 +1,30 @@
 # Asset Ledger
 
-A mobile-first field workspace built on the existing Next.js App Router scaffold. Uses the original React, TypeScript, Tailwind and ESLint setup without additional dependencies.
+A mobile-first field workspace for tracking building and heritage assets, built with Next.js (App Router), React, TypeScript and Tailwind. Sign-in and the shared workflow record use Neon (Postgres and Neon Auth).
 
 ## Run locally
 
-```sh
-cd ~/Projects/asset-ledger
-npm install
-npm run dev -- --hostname 127.0.0.1
-```
+1. Install packages:
 
-Open http://localhost:3000. If that port is already in use, use the local URL printed by Next.js.
+   ```sh
+   cd ~/Projects/asset-ledger
+   npm install
+   ```
+
+2. Copy `.env.example` to `.env.local` and fill in `DATABASE_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET` and `ALLOWED_SIGNUP_EMAILS`.
+3. Create or update the database tables (safe to run again after pulling changes):
+
+   ```sh
+   npm run migrate
+   ```
+
+4. Start the app and open http://localhost:3000 (or the URL Next.js prints):
+
+   ```sh
+   npm run dev -- --hostname 127.0.0.1
+   ```
+
+5. Create an account on the sign-up page, then give it a role (see [Sign-in and roles](#sign-in-and-roles)). Without a role you can sign in but cannot use the workflow.
 
 ## Explore
 
@@ -19,14 +33,18 @@ Open http://localhost:3000. If that port is already in use, use the local URL pr
 - Asset detail: observations, metadata, evidence placeholder, review comments and editable demo status.
 - Consultant Review: outstanding records only. Changing a record to Reviewed removes it from the queue when you return.
 
-All records, names, observations and comments are synthetic. Session changes use React memory only and reset on refresh. There is no database, authentication, access control, upload, actual scan, or backend. Nothing is sent to consultants. Reviewed indicates demonstration completeness only, not engineering or safety approval. Full-Stop is a clearly labelled review hold, not an operational safety mechanism. No public deployment is configured by this change.
+All records, names, observations and comments are synthetic. The main workspace (dashboard, catalogue and review queue) still keeps changes in browser memory only; they reset on refresh and are not tied to roles. The workflow screen is the part that is saved and role-controlled (see below). There is no upload or actual scan. Nothing is sent to consultants. Reviewed indicates demonstration completeness only, not engineering or safety approval. Full-Stop is a clearly labelled review hold, not an operational safety mechanism. No public deployment is configured by this change.
 
 ## Checks
 
 ```sh
+npm test            # workflow rules, saved-operation handling and SQL splitting
+npm run typecheck
 npm run lint
-npm run build
+npm run build       # needs the values in .env.local
 ```
+
+GitHub runs the tests, type check and lint on every pull request and push to `main` (`.github/workflows/checks.yml`).
 
 After a build, preview with `npm run start -- --hostname 127.0.0.1`. System fonts are used so builds do not need to fetch web fonts.
 
@@ -40,7 +58,7 @@ The catalogue retains the six building assets and adds four synthetic heritage e
 
 Planned order: persistent Element Catalogue v1 using the existing Next.js application, PostgreSQL and dedicated file storage; authentication and permissions; real evidence uploads and recorded consultant decisions; drawing-linked identification and actual QR labels; timestamped movement history; costs and long-term conservation records. Offline operation and reliable synchronization remain planned.
 
-Full-Stop production target: hold dependent work until an authorized consultant reviews the evidence and records approval or rejection with a reason and timestamp; rejection retains the hold. The current demo cannot enforce this and does not provide an authorization boundary or durable audit trail. Any demo user can change its in-memory status. Evaluate licensing before incorporating any third-party source, including Arches.
+Full-Stop production target: hold dependent work until an authorized consultant reviews the evidence and records approval or rejection with a reason and timestamp; rejection retains the hold. The workflow screen now enforces this using the signed-in account's role and keeps a saved, append-only history. The main workspace's Full-Stop status is still in-memory and can be changed by any signed-in user. Evaluate licensing before incorporating any third-party source, including Arches.
 
 ## Drawing and stage-check workflow lab
 
@@ -57,26 +75,28 @@ Open `/workflow` or choose **Drawing & stage checks** in the main workspace. The
 
 ### Try it
 
-1. In Contractor mode, select GY-192. Its internal check is already complete, but the consultant hold is still red. The contractor cannot release it.
-2. Switch to Consultant, add a decision reason and select **Approve / release consultant hold**. The stage turns green and the contractor gets a session notice. Routine work then uses the checklist and Complete and continue action.
-3. Switch back to Contractor, record the next working location and start the next stage. It requires its own check.
-4. In Project controls, submit a contractor change request. Switch to Consultant to inspect and approve/reject it. A request or plan relaxation cannot clear an existing hold.
+You need two accounts: one with the Contractor role and one with the Consultant role (for example, two browsers or a private window).
 
-The schematic pins, evidence summaries, role switches, plan authority and notifications are local simulations only. No actual drawings/photos are uploaded, no secure authentication/authorization exists, and no messages, emails or push notifications leave the app. Real consultant authority and owner-reserved decisions must follow project agreements; the demo does not implement those agreements. Crate references are text, not linked manifests.
+1. As the contractor, select GY-192. Its internal check is already complete, but the consultant hold is still red. The contractor cannot release it.
+2. As the consultant, add a decision reason and select **Approve / release consultant hold**. The stage turns green and the contractor gets an inbox notice. Routine work then uses the checklist and Complete and continue action.
+3. As the contractor, record the next working location and start the next stage. It requires its own check.
+4. In Project controls, submit a contractor change request. As the consultant, inspect and approve/reject it. A request or plan relaxation cannot clear an existing hold.
 
-Session state resets on refresh or leaving the workflow page. Updates do not synchronize between browsers or users. Event history is not a durable audit trail. Response targets use elapsed hours; Today evaluates overdue state when timing is refreshed. No working-calendar scheduler, automatic reminder, or escalation service runs. No public deployment is configured.
+The schematic pins and evidence summaries are illustrative. No actual drawings/photos are uploaded, and no messages, emails or push notifications leave the app. Real consultant authority and owner-reserved decisions must follow project agreements; the demo does not implement those agreements. Crate references are text, not linked manifests.
+
+Every workflow change is saved on the server (`workflow_ops` table) with the person's account, name, role and time, and all signed-in users see the same state. The server rebuilds the current state by replaying the saved changes, and checks each new change against the rules using the role from the signed-in account, never a role sent by the browser. If two people save at once, the second is told to check the updated state and try again. The screen reloads when you return to its tab; it does not push live updates. Response targets use elapsed hours; Today evaluates overdue state when you select Refresh. No working-calendar scheduler, automatic reminder, or escalation service runs. No public deployment is configured.
 
 ### Verification
 
 With Node.js 24 (or another runtime supporting TypeScript type stripping):
 
 ```sh
-node --test app/workflow/workflow.test.mjs
+npm test
 npm run lint
 npm run build
 ```
 
-Tests cover separate authority, preservation of consultant holds, evidence changes invalidating passes, plan request decisions/version conflicts, and the complete eight-stage journey.
+Tests cover separate authority, preservation of consultant holds, evidence changes invalidating passes, plan request decisions/version conflicts, the complete eight-stage journey, checking of saved operations (unknown actions, browser-supplied roles, who-did-it recording, replay), and the database script's statement splitting.
 
 ## Streamlined field workflow and readability
 
@@ -86,7 +106,7 @@ Routine stages now use a checklist, evidence/verification note and next location
 
 The visual design uses navy navigation, blue primary actions, darker text, clearer borders and labelled traffic lights. Main instructions and labels are approximately 15–16px; headings, controls and touch targets are larger. Both the existing workspace and workflow screens use the higher-contrast theme. This is not a full accessibility certification.
 
-The 16 workflow checks cover the streamlined operations and background-review snapshots as well as the separate consultant/contractor authority rules. No cloud storage, actual uploads or secure accounts have been added.
+The workflow tests cover the streamlined operations and background-review snapshots as well as the separate consultant/contractor authority rules. No cloud storage or actual uploads have been added.
 
 ## Sign-in and roles
 
@@ -94,6 +114,26 @@ Pages and API routes require a signed-in account, provided by Neon Auth (email a
 
 Our sign-up page accepts only emails in `ALLOWED_SIGNUP_EMAILS`, and the proxy blocks direct calls to the sign-up API. The Neon Auth service may still accept other sign-ups unless public sign-up is turned off in the Neon console. Before turning that setting off, confirm the invited sign-up still works. If it doesn't, leave the setting on and rely on the proxy block.
 
-Each account needs a row in `user_roles` (role `Contractor` or `Consultant`). The owner adds these rows by hand. Event writes use the signed-in account's role, and an account with no role cannot write events. Consultant decisions are recorded only by a consultant account.
+Each account needs a row in `user_roles` (role `Contractor` or `Consultant`). The owner adds these rows by hand, for example in the Neon SQL editor:
 
-This is a demo-grade control for a small invited group. It is not a full audit or compliance system.
+```sql
+-- Find the account's id in the Neon console (Auth → Users), then:
+INSERT INTO user_roles (user_id, role) VALUES ('<user id>', 'Consultant');
+```
+
+The workflow screen and the events API use the signed-in account's role; there is no role switcher. An account with no role can sign in but cannot read or change the workflow. Consultant decisions are recorded only by a consultant account.
+
+### History cannot be edited
+
+`audit_events` and `workflow_ops` record who acted (account id and name). Database triggers refuse any UPDATE, DELETE or TRUNCATE on them, so a mistaken or deliberate change to history fails. The database owner can still remove those triggers. For a stronger guarantee, give the app its own database role that can only read and insert, and use that role's connection string as `DATABASE_URL`:
+
+```sql
+CREATE ROLE asset_ledger_app WITH LOGIN PASSWORD '<strong password>';
+GRANT SELECT, INSERT ON audit_events, workflow_ops TO asset_ledger_app;
+GRANT SELECT ON user_roles TO asset_ledger_app;
+GRANT USAGE ON SEQUENCE audit_events_id_seq TO asset_ledger_app;
+```
+
+Keep the owner connection for `npm run migrate` and for adding roles.
+
+This is a control for a small invited group. It is not a certified audit or compliance system.
