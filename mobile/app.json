@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Asset Ledger",
+    "slug": "asset-ledger-field",
+    "scheme": "assetledger",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.barkleyhunt.assetledger",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Asset Ledger uses the camera and LiDAR to scan and photograph building elements."
+      }
+    },
+    "android": {
+      "package": "com.barkleyhunt.assetledger",
+      "adaptiveIcon": {
+        "backgroundColor": "#14213d",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Asset Ledger uses the camera to photograph building elements and defects.",
+          "photosPermission": false,
+          "microphonePermission": false
+        }
+      ]
+    ]
+  }
+}

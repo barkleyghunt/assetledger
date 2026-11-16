@@ -97,3 +97,7 @@ Our sign-up page accepts only emails in `ALLOWED_SIGNUP_EMAILS`, and the proxy b
 Each account needs a row in `user_roles` (role `Contractor` or `Consultant`). The owner adds these rows by hand. Event writes use the signed-in account's role, and an account with no role cannot write events. Consultant decisions are recorded only by a consultant account.
 
 This is a demo-grade control for a small invited group. It is not a full audit or compliance system.
+
+## Phone app and LiDAR scanning
+
+`mobile/` holds the phone app (Expo, iOS and Android) for site capture: LiDAR surface and room scans on iPhone/iPad Pro, photo sets on other phones, scale checks, tap-to-measure and defect records. It records evidence only. Approvals stay in this web app. Data stays on the phone until sync is built. See `mobile/README.md` for build steps. The web app's lint and type-check skip `mobile/`.
