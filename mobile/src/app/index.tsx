@@ -1,14 +1,35 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, Text, View } from "react-native";
+import { Alert, FlatList, Text, View } from "react-native";
 import { LidarScanner } from "../../modules/lidar-scanner";
 import { Button, Card, styles } from "../components/ui";
-import { listElements } from "../lib/db";
+import { listElements, pendingCount } from "../lib/db";
+import { syncAll } from "../lib/sync";
 
 export default function ElementsScreen() {
   const [elements, setElements] = useState(() => listElements());
-  useFocusEffect(useCallback(() => setElements(listElements()), []));
+  const [pending, setPending] = useState(() => pendingCount());
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const reload = useCallback(() => {
+    setElements(listElements());
+    setPending(pendingCount());
+  }, []);
+  useFocusEffect(reload);
   const lidar = LidarScanner.isLidarAvailable();
+
+  const sync = async () => {
+    setSyncStatus("Starting sync…");
+    try {
+      const r = await syncAll(setSyncStatus);
+      const sent = `${r.scans} scan${r.scans === 1 ? "" : "s"} and ${r.defects} defect${r.defects === 1 ? "" : "s"} sent.`;
+      Alert.alert(r.errors.length ? "Sync finished with problems" : "Sync complete", r.errors.length ? `${sent}\n\n${r.errors.join("\n")}` : sent);
+    } catch (e) {
+      Alert.alert("Sync", e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncStatus(null);
+      reload();
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -25,6 +46,13 @@ export default function ElementsScreen() {
             </Text>
             <View style={{ height: 12 }} />
             <Button title="Add element" onPress={() => router.push("/element/new")} />
+            <Button
+              title={syncStatus ?? (pending ? `Sync to web app (${pending} waiting)` : "Sync to web app")}
+              kind="secondary"
+              onPress={sync}
+              disabled={syncStatus != null}
+            />
+            <Button title="Settings" kind="secondary" onPress={() => router.push("/settings")} />
           </View>
         }
         ListEmptyComponent={<Text style={styles.muted}>No elements yet. Add one using the same ID as the web catalogue (e.g. GY-192).</Text>}

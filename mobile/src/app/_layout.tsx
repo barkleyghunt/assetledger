@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="scan/[id]" options={{ title: "Scan" }} />
         <Stack.Screen name="capture/photo-set" options={{ title: "Photo set" }} />
         <Stack.Screen name="defect/new" options={{ title: "Record defect", presentation: "modal" }} />
+        <Stack.Screen name="settings" options={{ title: "Settings" }} />
       </Stack>
     </>
   );

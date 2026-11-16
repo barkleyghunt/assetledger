@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS scans (
   notes TEXT NOT NULL DEFAULT '',
   captured_at TEXT NOT NULL,
   device TEXT NOT NULL,
-  synced INTEGER NOT NULL DEFAULT 0
+  synced INTEGER NOT NULL DEFAULT 0,
+  files_uploaded INTEGER NOT NULL DEFAULT 0,
+  uploaded_names TEXT
 );
 CREATE TABLE IF NOT EXISTS measurements (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +51,8 @@ CREATE TABLE IF NOT EXISTS defects (
   photo_uri TEXT,
   proposed_repair TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
-  synced INTEGER NOT NULL DEFAULT 0
+  synced INTEGER NOT NULL DEFAULT 0,
+  photo_uploaded INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,7 +165,7 @@ export function addScan(input: {
 
 // The scan file itself is never edited. Only the scale check can be recorded, and it is logged.
 export function recordScaleCheck(scan: Scan, tapeMm: number, scanMm: number) {
-  db.runSync("UPDATE scans SET ref_tape_mm = ?, ref_scan_mm = ? WHERE id = ?", tapeMm, scanMm, scan.id);
+  db.runSync("UPDATE scans SET ref_tape_mm = ?, ref_scan_mm = ?, synced = 0 WHERE id = ?", tapeMm, scanMm, scan.id);
   const diff = scaleDeviation(tapeMm, scanMm);
   logEvent(scan.elementId, `Scale check on scan ${scan.id}: tape ${tapeMm} mm, scan ${scanMm} mm (${diff}).`);
 }
@@ -180,6 +183,7 @@ export function addMeasurements(scan: Scan, items: { label: string; mm: number }
     db.runSync("INSERT INTO measurements (scan_id, label, mm, created_at) VALUES (?, ?, ?, ?)", scan.id, m.label, m.mm, now());
   }
   if (items.length) {
+    db.runSync("UPDATE scans SET synced = 0 WHERE id = ?", scan.id);
     const list = items.map((m) => `${m.label} ${Math.round(m.mm)} mm`).join(", ");
     logEvent(scan.elementId, `Measured on scan ${scan.id}: ${list}.`);
   }
@@ -222,4 +226,43 @@ export function addDefect(input: Omit<Defect, "id" | "createdAt" | "synced">): s
   const repair = input.proposedRepair ? ` Proposed repair: ${input.proposedRepair}.` : "";
   logEvent(input.elementId, `Defect recorded: ${input.type}, severity ${input.severity}${size}, ${input.location || "location not given"}.${repair}`);
   return id;
+}
+
+// ---- Sync state ----
+
+export function unsyncedScans(): (Scan & { filesUploaded: boolean; uploadedNames: string[] })[] {
+  return db
+    .getAllSync<ScanRow & { files_uploaded: number; uploaded_names: string | null }>("SELECT * FROM scans WHERE synced = 0 ORDER BY captured_at")
+    .map((r) => ({ ...toScan(r), filesUploaded: r.files_uploaded === 1, uploadedNames: r.uploaded_names ? (JSON.parse(r.uploaded_names) as string[]) : [] }));
+}
+
+export function markScanFilesUploaded(id: string, names: string[]) {
+  db.runSync("UPDATE scans SET files_uploaded = 1, uploaded_names = ? WHERE id = ?", JSON.stringify(names), id);
+}
+
+export function markScanSynced(id: string) {
+  db.runSync("UPDATE scans SET synced = 1 WHERE id = ?", id);
+}
+
+export function isScanSynced(id: string): boolean {
+  return db.getFirstSync<{ synced: number }>("SELECT synced FROM scans WHERE id = ?", id)?.synced === 1;
+}
+
+export function unsyncedDefects(): (Defect & { photoUploaded: boolean })[] {
+  return db
+    .getAllSync<DefectRow & { photo_uploaded: number }>("SELECT * FROM defects WHERE synced = 0 ORDER BY created_at")
+    .map((r) => ({ ...toDefect(r), photoUploaded: r.photo_uploaded === 1 }));
+}
+
+export function markDefectPhotoUploaded(id: string) {
+  db.runSync("UPDATE defects SET photo_uploaded = 1 WHERE id = ?", id);
+}
+
+export function markDefectSynced(id: string) {
+  db.runSync("UPDATE defects SET synced = 1 WHERE id = ?", id);
+}
+
+export function pendingCount(): number {
+  const r = db.getFirstSync<{ n: number }>("SELECT (SELECT COUNT(*) FROM scans WHERE synced = 0) + (SELECT COUNT(*) FROM defects WHERE synced = 0) AS n");
+  return r?.n ?? 0;
 }

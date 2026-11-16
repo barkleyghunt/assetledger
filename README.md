@@ -100,4 +100,27 @@ This is a demo-grade control for a small invited group. It is not a full audit o
 
 ## Phone app and LiDAR scanning
 
-`mobile/` holds the phone app (Expo, iOS and Android) for site capture: LiDAR surface and room scans on iPhone/iPad Pro, photo sets on other phones, scale checks, tap-to-measure and defect records. It records evidence only. Approvals stay in this web app. Data stays on the phone until sync is built. See `mobile/README.md` for build steps. The web app's lint and type-check skip `mobile/`.
+`mobile/` holds the phone app (Expo, iOS and Android) for site capture: LiDAR surface and room scans on iPhone/iPad Pro, photo sets on other phones, scale checks, tap-to-measure and defect records. It records evidence only. Approvals stay in this web app. See `mobile/README.md` for build steps. The web app's lint and type-check skip `mobile/`.
+
+### Phone sync and file storage (Cloudflare R2)
+
+Scans, photos and defects sync from the phone to this app. Files go straight from the phone to a private Cloudflare R2 bucket using 1-hour signed upload links; they never pass through the web server. Each scan and defect also adds an `Evidence` event to `audit_events` (stage 0 unless the phone sends one).
+
+Setup:
+
+1. In Cloudflare, create an R2 bucket (e.g. `assetledger-scans`) and an API token with Object Read & Write on that bucket only.
+2. Add `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` to `.env.local` (see `.env.example`) and to the hosting environment. Never commit them.
+3. Run `node --env-file=.env.local scripts/migrate.mjs` to add the `device_tokens`, `scans` and `defects` tables.
+4. For each phone: `node --env-file=.env.local scripts/create-device-token.mjs <user-id> "Phone name"`. The account must already have a `user_roles` row. Enter the printed token and the web app address in the phone's Settings.
+5. To block a phone, set `revoked_at` on its `device_tokens` row.
+
+Routes:
+
+- `GET /api/device/whoami`, `POST /api/device/uploads`, `POST /api/device/scans`, `POST /api/device/defects`: phone only, `Authorization: Bearer <device token>`. The proxy lets `/api/device/*` through and each route checks the token.
+- `GET /api/scans?elementId=...`: signed-in web users. Returns scans and defects with 15-minute download links.
+
+Repeat syncs are safe. A scan's files and capture details are fixed once received; only its scale check, measurements and notes can be updated, and each update is logged. A defect already received is not changed. Phone uploads never record consultant decisions.
+
+Not built yet: showing scans and the 3D model on the web asset pages (the API is ready), photo-set processing into 3D models, and checking that uploaded files exist before a scan is recorded.
+
+`node --test lib/r2.test.mjs` checks that storage paths are built only from safe IDs and file names.

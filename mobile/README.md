@@ -13,12 +13,13 @@ The Next.js web app in the repo root stays the place for consultant review and a
 - **Scale check**: tape one distance on site, measure it on the scan, and record the difference.
 - **Defects**: type, severity 1–5, location, size, photo, proposed repair. Can be linked to a scan.
 - **History**: every capture, measurement, scale check and defect is logged. There are no edit or delete functions for the log.
+- **Sync**: sends scans, photos and defects to the web app. Files upload straight to Cloudflare R2. Set the web app address and device token in **Settings** (the token is kept in secure storage). Anything not yet sent shows on the **Sync** button, and a failed sync can be repeated safely.
 
 The phone records evidence only. It has no approve or release buttons. Consultant decisions stay in the web app under the existing Contractor/Consultant rules.
 
 ## Not built yet
 
-- Sync to the web app: needs file storage and a `/api/scans` route. All data stays on the phone for now.
+- Showing synced scans and 3D models on the web asset pages.
 - Server processing of photo sets into 3D models.
 - 3D viewer on Android. Android phones have no LiDAR, so they only capture photo sets.
 - PDF condition report export.
