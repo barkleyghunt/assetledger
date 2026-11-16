@@ -1,4 +1,4 @@
-// Creates the audit_events table. Run once per database:
+// Creates or updates the tables in db/schema.sql. Run once per database:
 //   node --env-file=.env.local scripts/migrate.mjs
 import { neon } from "@neondatabase/serverless";
 import { readFileSync } from "node:fs";
@@ -15,4 +15,4 @@ const schema = readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"
 for (const statement of schema.split(";").map((s) => s.replace(/--.*$/gm, "").trim()).filter(Boolean)) {
   await sql.query(statement);
 }
-console.log("Migration complete: audit_events is ready.");
+console.log("Migration complete: audit_events, user_roles, device_tokens, scans and defects are ready.");
