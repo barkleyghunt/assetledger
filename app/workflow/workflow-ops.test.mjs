@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseOp, applyOp, replay } from './workflow-ops.ts';
+import { parseOp, applyOp, replay, replayLegacy, HistoryError } from './workflow-ops.ts';
 import { createModel } from './workflow-model.ts';
 
 const at = '2026-11-16T10:00:00Z';
@@ -59,4 +59,11 @@ test('replaying saved history rebuilds the same state', () => {
   const step = history.reduce((m, { op, ...actor }) => applyOp(m, op, actor), createModel());
   assert.deepEqual(replay(history), step);
   assert.equal(get(replay(history), 'GY-192').stage, 2);
+});
+
+test('replayLegacy rebuilds valid history and names the problem when the rules now forbid a saved change', () => {
+  const ok = [{ ...contractor, op: { op: 'transition', type: 'comment', id: 'HY-142', text: 'Noted on site.' } }];
+  assert.deepEqual(replayLegacy(ok), replay(ok));
+  const broken = [{ ...contractor, op: { op: 'transition', type: 'comment', id: 'NO-SUCH', text: 'x' } }];
+  assert.throws(() => replayLegacy(broken), (e) => e instanceof HistoryError && /could not be rebuilt: Element not found/.test(e.message));
 });

@@ -1,7 +1,8 @@
-// Workflow operations: the saved, replayable form of every change to the workflow.
-// The server stores each operation with who made it and when, then rebuilds the
-// current state by replaying them in order from createModel(). The role always
-// comes from the signed-in account, never from the browser.
+// Workflow operations: the saved form of every change to the workflow.
+// The server stores each operation with who made it, when, and the workflow state
+// that resulted. The current state is read from the latest saved row, so a later
+// change to the rules or the starting data cannot make existing history unreadable.
+// The role always comes from the signed-in account, never from the browser.
 import { actionTypes, createModel, decideProposal, decideReview, proposePlan, revisePlan, transition } from "./workflow-model.ts";
 import type { Gate, Model, Role, Rule } from "./workflow-model.ts";
 
@@ -93,4 +94,16 @@ export function applyOp(model: Model, op: Op, { role, by, at }: Actor): Model {
 // Rebuilds the current state from the saved history, oldest first.
 export function replay(history: StoredOp[]): Model {
   return history.reduce((model, { op, ...actor }) => applyOp(model, op, actor), createModel());
+}
+
+// Raised when saved changes that have no stored state can no longer be rebuilt under the current rules.
+export class HistoryError extends Error {}
+
+// Only for changes saved before each row kept its resulting state: rebuilds by replaying them.
+export function replayLegacy(history: StoredOp[]): Model {
+  try {
+    return replay(history);
+  } catch (error) {
+    throw new HistoryError(`Saved workflow history could not be rebuilt: ${(error as Error).message}`);
+  }
 }

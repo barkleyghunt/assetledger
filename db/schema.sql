@@ -79,9 +79,8 @@ CREATE TABLE IF NOT EXISTS defects (
 
 CREATE INDEX IF NOT EXISTS defects_element_idx ON defects (element_id, recorded_at);
 
--- Every change made on the workflow screen, in order. The app rebuilds the current
--- workflow state by replaying these rows. Two people saving at the same moment
--- cannot both take the same seq, so neither silently overwrites the other.
+-- Every change made on the workflow screen, in order. Two people saving at the same
+-- moment cannot both take the same seq, so neither silently overwrites the other.
 CREATE TABLE IF NOT EXISTS workflow_ops (
   seq         INTEGER     PRIMARY KEY CHECK (seq > 0),
   user_id     TEXT        NOT NULL,
@@ -91,6 +90,11 @@ CREATE TABLE IF NOT EXISTS workflow_ops (
   at          TEXT        NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- The workflow state that resulted from each change. The app reads the current state
+-- from the latest row, so later changes to the rules cannot make old history unreadable.
+-- Rows written before this column existed have none and are replayed instead.
+ALTER TABLE workflow_ops ADD COLUMN IF NOT EXISTS state JSONB;
 
 -- History is append-only: refuse any UPDATE, DELETE or TRUNCATE on the history tables.
 -- The database owner can still remove these triggers. For a stronger guarantee,
