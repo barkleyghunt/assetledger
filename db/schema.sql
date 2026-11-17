@@ -26,6 +26,59 @@ CREATE TABLE IF NOT EXISTS user_roles (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Phone app access. Each phone gets its own token, created by the owner with
+-- scripts/create-device-token.mjs. Only a SHA-256 hash is stored. Set revoked_at to block a phone.
+CREATE TABLE IF NOT EXISTS device_tokens (
+  token_hash  TEXT PRIMARY KEY,
+  user_id     TEXT        NOT NULL REFERENCES user_roles(user_id),
+  label       TEXT        NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  revoked_at  TIMESTAMPTZ
+);
+
+-- Scans uploaded from the phone. Files live in Cloudflare R2 under file_prefix.
+CREATE TABLE IF NOT EXISTS scans (
+  id            TEXT PRIMARY KEY,
+  element_id    TEXT        NOT NULL,
+  method        TEXT        NOT NULL CHECK (method IN ('lidar-surface', 'lidar-room', 'photo-set')),
+  file_prefix   TEXT        NOT NULL,
+  file_names    TEXT[]      NOT NULL DEFAULT '{}',
+  photo_count   INTEGER,
+  vertex_count  INTEGER,
+  face_count    INTEGER,
+  ref_tape_mm   REAL,
+  ref_scan_mm   REAL,
+  measurements  JSONB       NOT NULL DEFAULT '[]',
+  notes         TEXT        NOT NULL DEFAULT '',
+  captured_at   TIMESTAMPTZ NOT NULL,
+  device        TEXT        NOT NULL,
+  uploaded_by   TEXT        NOT NULL,
+  role          TEXT        NOT NULL CHECK (role IN ('Contractor', 'Consultant')),
+  received_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS scans_element_idx ON scans (element_id, captured_at);
+
+-- Defects recorded on the phone. Evidence only: approval is a consultant Decision event.
+CREATE TABLE IF NOT EXISTS defects (
+  id               TEXT PRIMARY KEY,
+  element_id       TEXT        NOT NULL,
+  scan_id          TEXT        REFERENCES scans(id),
+  type             TEXT        NOT NULL,
+  severity         INTEGER     NOT NULL CHECK (severity BETWEEN 1 AND 5),
+  location         TEXT        NOT NULL DEFAULT '',
+  size_mm          REAL,
+  notes            TEXT        NOT NULL DEFAULT '',
+  photo_key        TEXT,
+  proposed_repair  TEXT        NOT NULL DEFAULT '',
+  recorded_at      TIMESTAMPTZ NOT NULL,
+  uploaded_by      TEXT        NOT NULL,
+  role             TEXT        NOT NULL CHECK (role IN ('Contractor', 'Consultant')),
+  received_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS defects_element_idx ON defects (element_id, recorded_at);
+
 -- Every change made on the workflow screen, in order. The app rebuilds the current
 -- workflow state by replaying these rows. Two people saving at the same moment
 -- cannot both take the same seq, so neither silently overwrites the other.
