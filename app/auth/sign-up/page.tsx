@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import PasswordInput from "../password-input";
 import { signUpWithEmail } from "@/app/actions/auth";
 
 export default function SignUpPage() {
@@ -11,7 +12,7 @@ export default function SignUpPage() {
       <form action={action} style={{ display: "grid", gap: "0.75rem" }}>
         <label>Name<input name="name" required style={{ width: "100%", padding: "0.5rem" }} /></label>
         <label>Email<input name="email" type="email" required style={{ width: "100%", padding: "0.5rem" }} /></label>
-        <label>Password<input name="password" type="password" minLength={8} required style={{ width: "100%", padding: "0.5rem" }} /></label>
+        <PasswordInput label="Password" name="password" autoComplete="new-password" minLength={8} required />
         {state?.error && <p role="alert" style={{ color: "#b91c1c" }}>{state.error}</p>}
         <button type="submit" disabled={pending} style={{ padding: "0.6rem", fontWeight: 600 }}>
           {pending ? "Creating…" : "Create account"}

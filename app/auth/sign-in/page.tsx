@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import PasswordInput from "../password-input";
 import { signInWithEmail } from "@/app/actions/auth";
 
 export default function SignInPage() {
@@ -10,7 +11,7 @@ export default function SignInPage() {
       <h1 style={{ fontSize: "1.5rem", fontWeight: 700 }}>Sign in</h1>
       <form action={action} style={{ display: "grid", gap: "0.75rem" }}>
         <label>Email<input name="email" type="email" required style={{ width: "100%", padding: "0.5rem" }} /></label>
-        <label>Password<input name="password" type="password" required style={{ width: "100%", padding: "0.5rem" }} /></label>
+        <PasswordInput label="Password" name="password" autoComplete="current-password" required />
         {state?.error && <p role="alert" style={{ color: "#b91c1c" }}>{state.error}</p>}
         <button type="submit" disabled={pending} style={{ padding: "0.6rem", fontWeight: 600 }}>
           {pending ? "Signing in…" : "Sign in"}
