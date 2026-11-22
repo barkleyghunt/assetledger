@@ -164,3 +164,9 @@ Repeat syncs are safe. A scan's files and capture details are fixed once receive
 Not built yet: showing scans and the 3D model on the web asset pages (the API is ready), photo-set processing into 3D models, and checking that uploaded files exist before a scan is recorded.
 
 `node --test lib/r2.test.mjs` checks that storage paths are built only from safe IDs and file names.
+
+## Set or reset an account password
+
+Open `/auth/forgot-password` (also linked from sign-in). Existing accounts, including users created in the Neon console without a password, can request a password email. The email returns to `/auth/reset-password`; a valid, unexpired token and matching passwords are required. The request page gives the same success message whether or not an account exists. Neon handles token validation and email delivery; the app does not store reset tokens or passwords.
+
+Allow the app origin in Neon Auth trusted domains (Allow Localhost for local development). Keep the app running when opening the email link. Reset pages are public; invited sign-up restrictions and account roles are unchanged. Verify email delivery, setting a password and subsequent sign-in against the configured Neon project before deployment.

@@ -16,6 +16,7 @@ export default function SignInPage() {
           {pending ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <p><a href="/auth/forgot-password">Forgot password or need to set one?</a></p>
       <p style={{ marginTop: "1rem" }}>New here? <a href="/auth/sign-up">Create an account</a> (invited emails only).</p>
     </main>
   );

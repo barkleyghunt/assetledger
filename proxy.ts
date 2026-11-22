@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth/server";
 
 const protect = auth.middleware({
   loginUrl: "/auth/sign-in",
-  publicRoutes: ["/auth/sign-in", "/auth/sign-up"],
+  publicRoutes: ["/auth/sign-in", "/auth/sign-up", "/auth/forgot-password", "/auth/reset-password"],
 });
 
 // Sign-up is only allowed through our invite-checked server action, never by calling the auth API directly.
