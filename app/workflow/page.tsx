@@ -1,17 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { createModel, transition, stages, criteria, needsConsultant, nextReviewer, canContinue, decideReview } from "./workflow-model";
-import type { Role, Element, Action } from "./workflow-model";
+import { useCallback, useEffect, useState } from "react";
+import { stages, criteria, needsConsultant, nextReviewer, canContinue } from "./workflow-model";
+import type { Role, Element, Action, Model } from "./workflow-model";
+import type { Op } from "./workflow-ops";
 import ProjectControls from "./project-controls";
 const lightNames = {red:"Red · Full-Stop",amber:"Amber · Action / question",green:"Green · Passed"};
 function Signal({element}:{element:Element}) {return <span className={`signal ${element.light}`}><span aria-hidden="true">●</span> {lightNames[element.light]}</span>;}
 const stamp = (iso:string) => new Date(iso).toLocaleString("en-CA",{timeZone:"America/Toronto",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false});
 
+type Loaded={model:Model;seq:number;me:{name:string;role:Role}};
+async function fetchWorkflow():Promise<Loaded|{error:string}> {
+  try {
+    const res=await fetch("/api/workflow",{cache:"no-store"});
+    const data=await res.json();
+    return res.ok?data:{error:data.error??"Could not load the workflow."};
+  } catch {return {error:"Could not reach the server. Check your connection and refresh."};}
+}
+
 export default function Workflow() {
-  const [model,setModel]=useState(createModel);
-  const [role,setRole]=useState<Role>("Contractor");
+  const [model,setModel]=useState<Model|null>(null);
+  const [seq,setSeq]=useState(0);
+  const [me,setMe]=useState<{name:string;role:Role}|null>(null);
+  const [loadError,setLoadError]=useState("");
+  const [busy,setBusy]=useState(false);
   const [view,setView]=useState("Drawing & journey");
   const [selected,setSelected]=useState("GY-192");
   const [text,setText]=useState("");
@@ -20,26 +33,56 @@ export default function Workflow() {
   const [reviewNote,setReviewNote]=useState("");
   const [message,setMessage]=useState("");
   const [clock,setClock]=useState<string|null>(null);
+  // The shared record lives on the server. Reload it on open and whenever this tab regains focus.
+  const load=useCallback(()=>fetchWorkflow().then(result=>{
+    if("error" in result){setLoadError(result.error);return;}
+    setModel(result.model);setSeq(result.seq);setMe(result.me);setLoadError("");setClock(new Date().toISOString());
+  }),[]);
+  useEffect(()=>{load();window.addEventListener("focus",load);return()=>window.removeEventListener("focus",load);},[load]);
+  // Saves one change as the signed-in person. Returns an error message, or null on success.
+  async function send(op:Op):Promise<string|null> {
+    if(busy)return "Still saving the previous change.";
+    setBusy(true);
+    try {
+      const res=await fetch("/api/workflow",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({seq,op})});
+      const data=await res.json();
+      if(data.model){setModel(data.model);setSeq(data.seq);}
+      if(data.me)setMe(data.me);
+      if(!res.ok)return data.error??"The change could not be saved.";
+      setClock(new Date().toISOString());
+      return null;
+    } catch {return "Could not reach the server. Your change was not saved.";}
+    finally {setBusy(false);}
+  }
+  if(!model||!me)return <div className="flow-page"><main className="flow-main"><p role="status" className="flow-feedback">{loadError||"Loading the shared workflow…"}</p>{loadError&&<p><button className="secondary" onClick={load}>Try again</button> <Link href="/">← Main workspace</Link></p>}</main></div>;
+  const role=me.role;
   const current=model.elements.find(e=>e.id===selected)!;
   const inbox=model.notices.filter(n=>n.recipient===role);
   const unread=inbox.filter(n=>!n.read).length;
   const pendingReviews=model.reviews.filter(r=>r.status==="Pending");
   const tasks=model.elements.filter(e=>role==="Contractor" ? canContinue(e)&&e.stage<7 || !e.submitted || nextReviewer(e)==="Contractor"&&e.light!=="green" : e.submitted&&nextReviewer(e)==="Consultant"&&e.light!=="green");
   function select(id:string) {setSelected(id);setConfirmed(false);setText("");setLocation("");setMessage("");setView("Drawing & journey");}
-  function act(type:Action["type"]) {
-    const at=new Date().toISOString();
-    try {setModel(transition(model,{type,id:selected,role,text,at,location,confirmed}));setClock(at);setText("");if(type==="advance"||type==="complete"){setLocation("");setConfirmed(false);}setMessage("Demo action recorded. The drawing, timeline and role inboxes now reflect this session change.");}
-    catch(error) {setMessage(error instanceof Error?error.message:"Action could not be completed.");}
+  async function act(type:Action["type"]) {
+    const error=await send({op:"transition",type,id:selected,text,location,confirmed});
+    if(error){setMessage(error);return;}
+    setText("");if(type==="advance"||type==="complete"){setLocation("");setConfirmed(false);}
+    setMessage("Saved. Everyone on the project now sees this change.");
   }
+  async function review(id:number,accept:boolean) {
+    const error=await send({op:"decideReview",id,accept,reason:reviewNote});
+    if(error){setMessage(error);return;}
+    setReviewNote("");setMessage(accept?"Review accepted. Later-stage checks are unchanged.":"Review issue recorded. A consultant Full-Stop now blocks the current stage.");
+  }
+  async function markRead(ids:number[]) {const error=await send({op:"markRead",ids});if(error)setMessage(error);}
   function taskLabel(e:Element) {return canContinue(e) ? "Ready to continue · no blocking hold" : !e.submitted ? "Prepare evidence and submit for internal check" : !e.contractorPassed || e.contractorHold ? "Contractor internal verification required" : "Awaiting consultant approval / hold release";}
   return <div className="flow-page">
     <header className="flow-header"><Link href="/" className="flow-brand">▦ asset<span>ledger</span></Link><span>Northline Campus / Workflow lab</span><Link href="/">← Main workspace</Link></header>
     <main className="flow-main">
-      <div className="demo-banner">LOCAL SIMULATION · Synthetic drawing and scenarios. Role switching is not authentication. No shared live updates, actual files, email or push delivery. All edits reset on refresh. Scenario stages are separate from the catalogue’s sample snapshots.</div>
-      <div className="page-heading"><div><div className="eyebrow">FROM REMOVAL TO STORAGE</div><h1>Keep every element moving.</h1><p>Stage checks, conversations and decisions in one connected view.</p></div><label className="role-switch">Simulate role<select aria-label="Simulate role" value={role} onChange={e=>{setRole(e.target.value as Role);setMessage("");}}><option>Contractor</option><option>Consultant</option></select></label></div>
+      <div className="demo-banner">SHARED RECORD · Changes are saved and seen by everyone on the project. Each entry records who acted. Synthetic drawing and scenarios. No actual files, email or push delivery. Scenario stages are separate from the catalogue’s sample snapshots.</div>
+      <div className="page-heading"><div><div className="eyebrow">FROM REMOVAL TO STORAGE</div><h1>Keep every element moving.</h1><p>Stage checks, conversations and decisions in one connected view.</p></div><p className="role-switch">Signed in as <strong>{me.name}</strong> · {role}</p></div>
       <div className="flow-tabs" role="navigation" aria-label="Workflow views">{["Drawing & journey","Today & notifications","Project controls"].map(v=><button key={v} aria-current={view===v?"page":undefined} className={view===v?"selected":""} onClick={()=>{setView(v);setMessage("");}}>{v}{v==="Today & notifications"&&<span>{unread}</span>}</button>)}</div>
-      <p className="hint">Session updates only · {clock?`Last session change ${stamp(clock)} ET` : "No live connection"}. Response targets use elapsed hours in this prototype; no scheduled reminders run.</p>
-      {role==="Consultant"&&pendingReviews.length>0&&<section className="panel background-reviews"><div className="eyebrow">NON-BLOCKING EVIDENCE REVIEWS</div><h2>Review without interrupting routine work</h2><label className="field-label" htmlFor="review-note">Review decision reason</label><textarea id="review-note" rows={2} maxLength={2000} value={reviewNote} onChange={e=>setReviewNote(e.target.value)}/>{pendingReviews.map(r=><article key={r.id}><strong>{r.element} · {stages[r.stage]}</strong><p className="observation">{r.evidence}</p><div className="flow-actions"><button className="secondary" disabled={!reviewNote.trim()} onClick={()=>{try{setModel(decideReview(model,r.id,true,reviewNote,role,new Date().toISOString()));setReviewNote("");setMessage("Review accepted. Later-stage checks are unchanged.");}catch(e){setMessage(e instanceof Error?e.message:"Unable to record review.");}}}>Accept evidence review</button><button className="danger-button" disabled={!reviewNote.trim()} onClick={()=>{try{setModel(decideReview(model,r.id,false,reviewNote,role,new Date().toISOString()));setReviewNote("");setMessage("Review issue recorded. A consultant Full-Stop now blocks the current stage.");}catch(e){setMessage(e instanceof Error?e.message:"Unable to record review.");}}}>Raise issue / stop current work</button></div></article>)}</section>}
+      <p className="hint">{clock?`Last updated ${stamp(clock)} ET`:"Not yet loaded"} · reloads when you return to this tab. Response targets use elapsed hours in this prototype; no scheduled reminders run.</p>
+      {role==="Consultant"&&pendingReviews.length>0&&<section className="panel background-reviews"><div className="eyebrow">NON-BLOCKING EVIDENCE REVIEWS</div><h2>Review without interrupting routine work</h2><label className="field-label" htmlFor="review-note">Review decision reason</label><textarea id="review-note" rows={2} maxLength={2000} value={reviewNote} onChange={e=>setReviewNote(e.target.value)}/>{pendingReviews.map(r=><article key={r.id}><strong>{r.element} · {stages[r.stage]}</strong><p className="observation">{r.evidence}</p><div className="flow-actions"><button className="secondary" disabled={!reviewNote.trim()} onClick={()=>review(r.id,true)}>Accept evidence review</button><button className="danger-button" disabled={!reviewNote.trim()} onClick={()=>review(r.id,false)}>Raise issue / stop current work</button></div></article>)}</section>}
       {view==="Drawing & journey" && <>
         <div className="flow-overview"><section className="panel elevation-panel"><div className="panel-heading"><div><div className="eyebrow">ILLUSTRATIVE DRAWING · DEMO-01 / REV A</div><h2>Heritage element locator</h2></div><span className="badge planned">Not a site drawing</span></div><p className="hint">Schematic overview of several building faces. Pin positions are illustrative, not surveyed coordinates. Select a labelled element.</p>
           <div className="elevation"><svg viewBox="0 0 720 300" role="img" aria-label="Synthetic stone building elevation with cornice, windows and parapet"><defs><pattern id="stone" width="60" height="28" patternUnits="userSpaceOnUse"><path d="M0 0H60V28H0Z" fill="none" stroke="#c7cdbc" strokeWidth="1"/></pattern></defs><path d="M50 90L360 24L670 90V263H50Z" fill="#f2f0e3" stroke="#7c8d74" strokeWidth="2"/><path d="M45 90H675M45 106H675M45 250H675M45 263H675" stroke="#8f9d84" strokeWidth="3"/><path d="M55 109H665V249H55Z" fill="url(#stone)"/>{[110,230,410,530].map(x=><g key={x}><rect x={x} y="132" width="75" height="91" fill="#d7dfcf" stroke="#819176" strokeWidth="5"/><path d={`M${x+37} 132V223M${x} 178H${x+75}`} stroke="#819176" strokeWidth="2"/></g>)}<path d="M320 263V143Q360 99 400 143V263Z" fill="#b5c4af" stroke="#6a8064" strokeWidth="4"/><path d="M360 141V263" stroke="#6a8064" strokeWidth="2"/><path d="M24 279H696" stroke="#87967e"/><text x="28" y="297" fill="#7c8875" fontSize="10">ILLUSTRATIVE ONLY · NOT TO SCALE</text></svg>{model.elements.map((e,i)=><button key={e.id} className={`element-pin ${e.light} ${e.id===selected?"pin-selected":""}`} style={{left:["27%","68%","49%","78%"][i],top:["28%","60%","83%","24%"][i]}} aria-label={`Select ${e.id}, ${stages[e.stage]}, ${lightNames[e.light]}`} aria-pressed={e.id===selected} onClick={()=>select(e.id)}><span aria-hidden="true">●</span> {e.id}</button>)}</div>
@@ -54,13 +97,13 @@ export default function Workflow() {
  {current.submitted&&current.contractorPassed&&!canContinue(current)&&<p className="hint">Your internal check is complete. Awaiting consultant release or resolution of an open issue.</p>}
  </div>
  <details className="more-actions"><summary>Separate evidence and internal-check actions</summary><div className="flow-actions"><button className="secondary" disabled={!text.trim()||current.submitted||current.light==="green"} onClick={()=>act("evidence")}>Record demo evidence</button><button className="secondary" disabled={!current.evidence||current.submitted} onClick={()=>act("submit")}>Submit for internal check</button><button className="secondary" disabled={!text.trim()||!current.submitted||current.contractorPassed&&!current.contractorHold&&!(current.question&&current.questionBy==="Contractor")} onClick={()=>act("pass")}>Pass contractor internal check</button></div></details>
- </>}{role==="Consultant"&&<button className="secondary" disabled={!text.trim()||current.consultantHold} onClick={()=>act("require-review")}>Require consultant approval at this stage</button>}{role==="Consultant"&&<button className="primary" disabled={!text.trim()||!current.submitted||!current.contractorPassed||current.contractorHold||!needsConsultant(current)||current.consultantPassed&&!current.consultantHold&&!current.question} onClick={()=>act("pass")}>Approve / release consultant hold</button>}<p className="hint">Contractor checks never release consultant holds. Consultant approval requires the internal check first. Comments do not approve work. A Full-Stop reopens evidence and requires checks to be repeated. Project authority is simulated here.</p>{current.due&&current.light!=="green"&&<p className="hint">Response target: {stamp(current.due)} ET. Refresh timing in Today to assess overdue reviews. No automatic release.</p>}
+ </>}{role==="Consultant"&&<button className="secondary" disabled={!text.trim()||current.consultantHold} onClick={()=>act("require-review")}>Require consultant approval at this stage</button>}{role==="Consultant"&&<button className="primary" disabled={!text.trim()||!current.submitted||!current.contractorPassed||current.contractorHold||!needsConsultant(current)||current.consultantPassed&&!current.consultantHold&&!current.question} onClick={()=>act("pass")}>Approve / release consultant hold</button>}<p className="hint">Contractor checks never release consultant holds. Consultant approval requires the internal check first. Comments do not approve work. A Full-Stop reopens evidence and requires checks to be repeated. Your role comes from your account.</p>{current.due&&current.light!=="green"&&<p className="hint">Response target: {stamp(current.due)} ET. Refresh timing in Today to assess overdue reviews. No automatic release.</p>}
         {current.stage===7&&current.light==="green"&&<p className="stage-note green">Journey complete · storage placement passed in this demo.</p>}</section>
-        <section className="timeline-section"><h3>Stage discussion & decision history</h3><p className="hint">Timestamped local demo events · Toronto time. Not a durable audit trail.</p><div className="event-timeline">{current.events.length ? [...current.events].reverse().map(event=><article key={event.id}><div><span className="badge planned">{event.kind}</span><small>{stamp(event.at)} ET · {event.role}</small></div><strong>{stages[event.stage]}</strong><p>{event.text}</p></article>) : <p className="empty">No events yet. Start with a demonstration evidence summary.</p>}</div></section></div></section>
+        <section className="timeline-section"><h3>Stage discussion & decision history</h3><p className="hint">Saved history · Toronto time. Entries cannot be edited or deleted.</p><div className="event-timeline">{current.events.length ? [...current.events].reverse().map(event=><article key={event.id}><div><span className="badge planned">{event.kind}</span><small>{stamp(event.at)} ET · {event.by?`${event.by} (${event.role})`:event.role}</small></div><strong>{stages[event.stage]}</strong><p>{event.text}</p></article>) : <p className="empty">No events yet. Start with a demonstration evidence summary.</p>}</div></section></div></section>
       </>}
-      {view==="Today & notifications"&&<><div className="review-intro"><strong>{role} · daily action list</strong><span>Open actions carry forward until addressed. New notifications remain until marked read. Reading does not approve anything.</span><button className="secondary" onClick={()=>setClock(new Date().toISOString())}>Refresh timing</button></div><div className="detail-grid"><section className="panel"><div className="panel-heading"><h2>Your next actions</h2><span className="count">{tasks.length} elements</span></div>{tasks.length?tasks.map(e=><button key={e.id} className="today-task" onClick={()=>select(e.id)}><div><strong>{e.id} · {stages[e.stage]}</strong><Signal element={e}/></div><p>{taskLabel(e)}</p><small>{e.due&&e.light!=="green"?`${clock && Date.parse(clock)>Date.parse(e.due)?"OVERDUE · ":"Target · "}${stamp(e.due)} ET` : "No active response deadline"}</small></button>):<div className="empty">No review submissions assigned to this role.</div>}<h3>Waiting on the other party</h3>{model.elements.filter(e=>e.submitted&&e.light!=="green"&&nextReviewer(e)!==role).map(e=><button className="today-task" key={e.id} onClick={()=>select(e.id)}>{e.id} · {stages[e.stage]}<p>Awaiting {nextReviewer(e).toLowerCase()} decision</p></button>)}<p className="hint">No background reminders, emails or escalations are sent. Production response targets will need agreed working calendars, named people and backups.</p></section><section className="panel"><div className="panel-heading"><h2>Session inbox</h2><button className="text-button" onClick={()=>setModel({...model,notices:model.notices.map(n=>n.recipient===role?{...n,read:true}:n)})}>Mark all read</button></div>{inbox.length?inbox.map(n=><article className={`inbox-note ${n.read?"read":""}`} key={n.id}><span className="eyebrow">{n.read?"READ":"NEW"} · {stamp(n.at)} ET</span><button className="text-button" onClick={()=>{setModel({...model,notices:model.notices.map(x=>x.id===n.id?{...x,read:true}:x)});if(n.element)select(n.element);else setView("Project controls");}}>{n.element || "Project controls"} →</button><p>{n.text}</p>{!n.read&&<button className="text-button" onClick={()=>setModel({...model,notices:model.notices.map(x=>x.id===n.id?{...x,read:true}:x)})}>Mark read</button>}</article>):<p className="empty">No notifications for this role.</p>}</section></div></>}
-      {view==="Project controls"&&<ProjectControls key={role} model={model} role={role} onChange={(next,feedback)=>{setModel(next);setClock(new Date().toISOString());setMessage(feedback);}}/>}
-      {view!=="Project controls"&&<p role="status" className="flow-feedback">{message}</p>}<footer><span>ASSET LEDGER / Workflow prototype</span><span>Synthetic evidence · No public deployment</span></footer>
+      {view==="Today & notifications"&&<><div className="review-intro"><strong>{role} · daily action list</strong><span>Open actions carry forward until addressed. New notifications remain until marked read. Reading does not approve anything.</span><button className="secondary" onClick={load}>Refresh</button></div><div className="detail-grid"><section className="panel"><div className="panel-heading"><h2>Your next actions</h2><span className="count">{tasks.length} elements</span></div>{tasks.length?tasks.map(e=><button key={e.id} className="today-task" onClick={()=>select(e.id)}><div><strong>{e.id} · {stages[e.stage]}</strong><Signal element={e}/></div><p>{taskLabel(e)}</p><small>{e.due&&e.light!=="green"?`${clock && Date.parse(clock)>Date.parse(e.due)?"OVERDUE · ":"Target · "}${stamp(e.due)} ET` : "No active response deadline"}</small></button>):<div className="empty">No review submissions assigned to this role.</div>}<h3>Waiting on the other party</h3>{model.elements.filter(e=>e.submitted&&e.light!=="green"&&nextReviewer(e)!==role).map(e=><button className="today-task" key={e.id} onClick={()=>select(e.id)}>{e.id} · {stages[e.stage]}<p>Awaiting {nextReviewer(e).toLowerCase()} decision</p></button>)}<p className="hint">No background reminders, emails or escalations are sent. Production response targets will need agreed working calendars, named people and backups.</p></section><section className="panel"><div className="panel-heading"><h2>Inbox</h2><button className="text-button" onClick={()=>markRead(inbox.filter(n=>!n.read).map(n=>n.id))}>Mark all read</button></div>{inbox.length?inbox.map(n=><article className={`inbox-note ${n.read?"read":""}`} key={n.id}><span className="eyebrow">{n.read?"READ":"NEW"} · {stamp(n.at)} ET</span><button className="text-button" onClick={()=>{if(!n.read)markRead([n.id]);if(n.element)select(n.element);else setView("Project controls");}}>{n.element || "Project controls"} →</button><p>{n.text}</p>{!n.read&&<button className="text-button" onClick={()=>markRead([n.id])}>Mark read</button>}</article>):<p className="empty">No notifications for this role.</p>}</section></div></>}
+      {view==="Project controls"&&<ProjectControls key={role} model={model} role={role} submit={send}/>}
+      {view!=="Project controls"&&<p role="status" className="flow-feedback">{message}</p>}<footer><span>ASSET LEDGER / Workflow prototype</span><span>Synthetic evidence · Shared project record</span></footer>
     </main>
   </div>;
 }

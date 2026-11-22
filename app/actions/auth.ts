@@ -17,6 +17,8 @@ export async function signUpWithEmail(_prev: { error: string } | null, formData:
   const name = String(formData.get("name") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   if (!name || !email || !password) return { error: "Name, email and password are required." };
+  // Checked here too: the browser's minLength can be bypassed.
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
   if (!isAllowedEmail(email)) return { error: "This email is not invited to Asset Ledger." };
   const { error } = await auth.signUp.email({ email, name, password });
   if (error) return { error: error.message || "Could not create the account." };
